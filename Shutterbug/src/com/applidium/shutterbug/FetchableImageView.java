@@ -19,6 +19,8 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
     }
 
     private FetchableImageViewListener mListener;
+    private int mMaxWidth;
+    private int mMaxHeight;
 
     public FetchableImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -53,8 +55,31 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
         ShutterbugManager.getSharedImageManager(getContext()).cancel(this);
     }
 
+    public void setMaxSize(int width, int height) {
+        mMaxWidth = width;
+        mMaxHeight = height;
+    }
+
     @Override
     public void onImageSuccess(ShutterbugManager imageManager, Bitmap bitmap, String url) {
+        if(mMaxWidth != 0 && mMaxHeight != 0) {
+            float width = bitmap.getWidth();
+            float height = bitmap.getHeight();
+
+            int newWidth = 0, newHeight = 0;
+            if(width > height) {
+                newWidth = mMaxWidth;
+                newHeight = (int)((mMaxWidth / width) * height);
+            } else {
+                newHeight = mMaxHeight;
+                newWidth = (int)((mMaxHeight / height) * width);
+            }
+            Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
+//            if(scaledBitmap != bitmap) {
+//                bitmap.recycle();
+//            }
+            bitmap = scaledBitmap;
+        }
         setImageBitmap(bitmap);
         requestLayout();
         if (mListener != null) {
