@@ -1,5 +1,15 @@
 package com.applidium.shutterbug.utils;
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
+
+import com.applidium.shutterbug.cache.ImageCache;
+import com.applidium.shutterbug.cache.ImageCache.ImageCacheListener;
+import com.applidium.shutterbug.downloader.ShutterbugDownloader;
+import com.applidium.shutterbug.downloader.ShutterbugDownloader.ShutterbugDownloaderListener;
+
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
@@ -9,17 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.os.AsyncTask;
-
-import com.applidium.shutterbug.cache.DiskLruCache.Snapshot;
-import com.applidium.shutterbug.cache.ImageCache;
-import com.applidium.shutterbug.cache.ImageCache.ImageCacheListener;
-import com.applidium.shutterbug.downloader.ShutterbugDownloader;
-import com.applidium.shutterbug.downloader.ShutterbugDownloader.ShutterbugDownloaderListener;
 
 public class ShutterbugManager implements ImageCacheListener, ShutterbugDownloaderListener {
     public interface ShutterbugManagerListener {
@@ -38,6 +37,8 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
     private List<DownloadRequest>             mDownloadRequests       = new ArrayList<DownloadRequest>();
     private List<ShutterbugManagerListener>   mDownloadImageListeners = new ArrayList<ShutterbugManagerListener>();
     private List<ShutterbugDownloader>        mDownloaders            = new ArrayList<ShutterbugDownloader>();
+    private int                               mMaxWidth;
+    private int                               mMaxHeight;
 
     final static private int                  LISTENER_NOT_FOUND      = -1;
 
@@ -50,6 +51,11 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
             sImageManager = new ShutterbugManager(context);
         }
         return sImageManager;
+    }
+
+    public void setMaxSize(int width, int height) {
+        mMaxWidth = width;
+        mMaxHeight = height;
     }
 
     public void download(String url, ShutterbugManagerListener listener) {
@@ -161,18 +167,35 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         protected Bitmap doInBackground(InputStream... params) {
             final ImageCache sharedImageCache = ImageCache.getSharedImageCache(mContext);
             final String cacheKey = getCacheKey(mDownloadRequest.getUrl());
-            // Store the image in the cache
-            Snapshot cachedSnapshot = sharedImageCache.storeToDisk(params[0], cacheKey);
             Bitmap bitmap = null;
-            if (cachedSnapshot != null) {
-                try {
-                    bitmap = BitmapFactory.decodeStream(cachedSnapshot.getInputStream(0));
-                } catch (OutOfMemoryError e) {
-                    e.printStackTrace();
+            try {
+                bitmap = BitmapFactory.decodeStream(params[0]);
+            } catch (OutOfMemoryError e) {
+                e.printStackTrace();
+            }
+            if (bitmap != null) {
+                if(mMaxWidth != 0 && mMaxHeight != 0) {
+                    float width = bitmap.getWidth();
+                    float height = bitmap.getHeight();
+
+                    if(width > mMaxWidth || height > mMaxHeight) {
+                        int newWidth = 0, newHeight = 0;
+                        if(width > height) {
+                            newWidth = mMaxWidth;
+                            newHeight = (int)((mMaxWidth / width) * height);
+                        } else {
+                            newHeight = mMaxHeight;
+                            newWidth = (int)((mMaxHeight / height) * width);
+                        }
+                        Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
+                        //            if(scaledBitmap != bitmap) {
+                        //                bitmap.recycle();
+                        //            }
+                        bitmap = scaledBitmap;
+                    }
                 }
-                if (bitmap != null) {
-                    sharedImageCache.storeToMemory(bitmap, cacheKey);
-                }
+                sharedImageCache.storeToDisk(bitmap, cacheKey);
+                sharedImageCache.storeToMemory(bitmap, cacheKey);
             }
             return bitmap;
         }

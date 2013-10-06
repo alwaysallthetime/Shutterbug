@@ -1,10 +1,5 @@
 package com.applidium.shutterbug.cache;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -15,6 +10,11 @@ import android.os.AsyncTask;
 import com.applidium.shutterbug.cache.DiskLruCache.Editor;
 import com.applidium.shutterbug.cache.DiskLruCache.Snapshot;
 import com.applidium.shutterbug.utils.DownloadRequest;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class ImageCache {
     public interface ImageCacheListener {
@@ -108,7 +108,29 @@ public class ImageCache {
         return null;
     }
 
+    public Snapshot storeToDisk(Bitmap bitmap, String cacheKey) {
+        try {
+            int bitmapWidth = bitmap.getWidth();
+            int bitmapHeight = bitmap.getHeight();
+            Editor editor = mDiskCache.edit(cacheKey);
+            final OutputStream outputStream = editor.newOutputStream(0);
+            try {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                outputStream.close();
+                editor.commit();
+                return mDiskCache.get(cacheKey);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public void storeToMemory(Bitmap bitmap, String cacheKey) {
+        int bitmapWidth = bitmap.getWidth();
+        int bitmapHeight = bitmap.getHeight();
         mMemoryCache.put(cacheKey, bitmap);
     }
 
