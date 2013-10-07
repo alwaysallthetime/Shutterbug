@@ -5,10 +5,14 @@ import com.applidium.shutterbug.utils.ShutterbugManager.ShutterbugManagerListene
 public class DownloadRequest {
     private String                    mUrl;
     private ShutterbugManagerListener mListener;
+    private int                       mMaxWidth;
+    private int                       mMaxHeight;
 
-    public DownloadRequest(String url, ShutterbugManagerListener listener) {
+    public DownloadRequest(String url, int maxWidth, int maxHeight, ShutterbugManagerListener listener) {
         mUrl = url;
         mListener = listener;
+        mMaxWidth = maxWidth;
+        mMaxHeight = maxHeight;
     }
 
     public String getUrl() {
@@ -17,5 +21,13 @@ public class DownloadRequest {
 
     public ShutterbugManagerListener getListener() {
         return mListener;
+    }
+
+    public int getMaxWidth() {
+        return mMaxWidth;
+    }
+
+    public int getMaxHeight() {
+        return mMaxHeight;
     }
 }

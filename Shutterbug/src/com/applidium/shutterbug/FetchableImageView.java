@@ -19,6 +19,8 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
     }
 
     private FetchableImageViewListener mListener;
+    private int                        mMaxWidth;
+    private int                        mMaxHeight;
 
     public FetchableImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -30,6 +32,11 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
 
     public void setListener(FetchableImageViewListener listener) {
         mListener = listener;
+    }
+
+    public void setMaxImageSize(int maxWidth, int maxHeight) {
+        mMaxWidth = maxWidth;
+        mMaxHeight = maxHeight;
     }
 
     public void setImage(String url) {
@@ -45,7 +52,7 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
         manager.cancel(this);
         setImageDrawable(placeholderDrawable);
         if (url != null) {
-            manager.download(url, this);
+            manager.download(url, mMaxWidth, mMaxHeight, this);
         }
     }
 

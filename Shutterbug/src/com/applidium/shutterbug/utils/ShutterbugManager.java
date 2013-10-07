@@ -37,8 +37,6 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
     private List<DownloadRequest>             mDownloadRequests       = new ArrayList<DownloadRequest>();
     private List<ShutterbugManagerListener>   mDownloadImageListeners = new ArrayList<ShutterbugManagerListener>();
     private List<ShutterbugDownloader>        mDownloaders            = new ArrayList<ShutterbugDownloader>();
-    private int                               mMaxWidth;
-    private int                               mMaxHeight;
 
     final static private int                  LISTENER_NOT_FOUND      = -1;
 
@@ -53,23 +51,23 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         return sImageManager;
     }
 
-    public void setMaxSize(int width, int height) {
-        mMaxWidth = width;
-        mMaxHeight = height;
+    public void download(String url, ShutterbugManagerListener listener) {
+        download(url, 0, 0, listener);
     }
 
-    public void download(String url, ShutterbugManagerListener listener) {
+    public void download(String url, int maxWidth, int maxHeight, ShutterbugManagerListener listener) {
         if (url == null || listener == null || mFailedUrls.contains(url)) {
             return;
         }
 
         mCacheListeners.add(listener);
         mCacheUrls.add(url);
-        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(url), this, new DownloadRequest(url, listener));
+        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(url, maxWidth, maxHeight), this, new DownloadRequest(url, maxWidth, maxHeight, listener));
     }
 
-    public static String getCacheKey(String url) {
+    public static String getCacheKey(String url, int maxWidth, int maxHeight) {
         try {
+            url = url + "w=" + maxWidth + "&h=" + maxHeight;
             MessageDigest md = MessageDigest.getInstance("SHA-1");
             md.update(url.getBytes("UTF-8"), 0, url.length());
             return String.format("%x", new BigInteger(md.digest()));
@@ -165,8 +163,10 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
 
         @Override
         protected Bitmap doInBackground(InputStream... params) {
+            final int maxWidth = mDownloadRequest.getMaxWidth();
+            final int maxHeight = mDownloadRequest.getMaxHeight();
             final ImageCache sharedImageCache = ImageCache.getSharedImageCache(mContext);
-            final String cacheKey = getCacheKey(mDownloadRequest.getUrl());
+            final String cacheKey = getCacheKey(mDownloadRequest.getUrl(), maxWidth, maxHeight);
             Bitmap bitmap = null;
             try {
                 bitmap = BitmapFactory.decodeStream(params[0]);
@@ -174,18 +174,18 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
                 e.printStackTrace();
             }
             if (bitmap != null) {
-                if(mMaxWidth != 0 && mMaxHeight != 0) {
+                if(maxWidth != 0 && maxHeight != 0) {
                     float width = bitmap.getWidth();
                     float height = bitmap.getHeight();
 
-                    if(width > mMaxWidth || height > mMaxHeight) {
+                    if(width > maxWidth || height > maxHeight) {
                         int newWidth = 0, newHeight = 0;
                         if(width > height) {
-                            newWidth = mMaxWidth;
-                            newHeight = (int)((mMaxWidth / width) * height);
+                            newWidth = maxWidth;
+                            newHeight = (int)((maxWidth / width) * height);
                         } else {
-                            newHeight = mMaxHeight;
-                            newWidth = (int)((mMaxHeight / height) * width);
+                            newHeight = maxHeight;
+                            newWidth = (int)((maxHeight / height) * width);
                         }
                         Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
                         //            if(scaledBitmap != bitmap) {

@@ -110,8 +110,6 @@ public class ImageCache {
 
     public Snapshot storeToDisk(Bitmap bitmap, String cacheKey) {
         try {
-            int bitmapWidth = bitmap.getWidth();
-            int bitmapHeight = bitmap.getHeight();
             Editor editor = mDiskCache.edit(cacheKey);
             final OutputStream outputStream = editor.newOutputStream(0);
             try {
@@ -129,8 +127,6 @@ public class ImageCache {
     }
 
     public void storeToMemory(Bitmap bitmap, String cacheKey) {
-        int bitmapWidth = bitmap.getWidth();
-        int bitmapHeight = bitmap.getHeight();
         mMemoryCache.put(cacheKey, bitmap);
     }
 
