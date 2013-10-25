@@ -1,20 +1,22 @@
 package com.applidium.shutterbug.downloader;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.methods.HttpGet;
-
 import android.os.AsyncTask;
 
 import com.applidium.shutterbug.utils.DownloadRequest;
 
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.HttpGet;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.List;
+import java.util.Map;
+
 public class ShutterbugDownloader {
     public interface ShutterbugDownloaderListener {
-        void onImageDownloadSuccess(ShutterbugDownloader downloader, InputStream inputStream, DownloadRequest downloadRequest);
+        void onImageDownloadSuccess(ShutterbugDownloader downloader, DownloaderInputStream inputStream, DownloadRequest downloadRequest);
 
         void onImageDownloadFailure(ShutterbugDownloader downloader, DownloadRequest downloadRequest);
     }
@@ -24,7 +26,7 @@ public class ShutterbugDownloader {
     private byte[]                             mImageData;
     private DownloadRequest                    mDownloadRequest;
     private final static int                   TIMEOUT = 30000;
-    private AsyncTask<Void, Void, InputStream> mCurrentTask;
+    private AsyncTask<Void, Void, DownloaderInputStream> mCurrentTask;
 
     public ShutterbugDownloader(String url, ShutterbugDownloaderListener listener, DownloadRequest downloadRequest) {
         mUrl = url;
@@ -49,10 +51,10 @@ public class ShutterbugDownloader {
     }
 
     public void start() {
-        mCurrentTask = new AsyncTask<Void, Void, InputStream>() {
+        mCurrentTask = new AsyncTask<Void, Void, DownloaderInputStream>() {
 
             @Override
-            protected InputStream doInBackground(Void... params) {
+            protected DownloaderInputStream doInBackground(Void... params) {
                 HttpGet request = new HttpGet(mUrl);
                 request.setHeader("Content-Type", "application/x-www-form-urlencoded");
 
@@ -63,7 +65,15 @@ public class ShutterbugDownloader {
                     connection.setReadTimeout(TIMEOUT);
                     connection.setInstanceFollowRedirects(true);
                     InputStream inputStream = connection.getInputStream();
-                    return inputStream;
+
+                    String contentType = null;
+                    Map<String,List<String>> headerFields = connection.getHeaderFields();
+                    List<String> contentTypes = headerFields.get("Content-Type");
+                    if(contentTypes != null && contentTypes.size() == 1) {
+                        contentType = contentTypes.get(0);
+                    }
+                    return new DownloaderInputStream(inputStream, contentType);
+
                 } catch (ClientProtocolException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -73,7 +83,7 @@ public class ShutterbugDownloader {
             }
 
             @Override
-            protected void onPostExecute(InputStream inputStream) {
+            protected void onPostExecute(DownloaderInputStream inputStream) {
                 if (isCancelled()) {
                     inputStream = null;
                 }

@@ -4,13 +4,17 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
+import android.util.Log;
 
 import com.applidium.shutterbug.cache.ImageCache;
 import com.applidium.shutterbug.cache.ImageCache.ImageCacheListener;
+import com.applidium.shutterbug.downloader.DownloaderImage;
+import com.applidium.shutterbug.downloader.DownloaderInputStream;
 import com.applidium.shutterbug.downloader.ShutterbugDownloader;
 import com.applidium.shutterbug.downloader.ShutterbugDownloader.ShutterbugDownloaderListener;
 
-import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -21,9 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 public class ShutterbugManager implements ImageCacheListener, ShutterbugDownloaderListener {
-    public interface ShutterbugManagerListener {
-        void onImageSuccess(ShutterbugManager imageManager, Bitmap bitmap, String url);
 
+    private static final String MIMETYPE_GIF = "image/gif";
+
+    public interface ShutterbugManagerListener {
+        void onImageSuccess(ShutterbugManager imageManager, DownloaderImage downloaderImage, String url);
         void onImageFailure(ShutterbugManager imageManager, String url);
     }
 
@@ -89,7 +95,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
     }
 
     @Override
-    public void onImageFound(ImageCache imageCache, Bitmap bitmap, String key, DownloadRequest downloadRequest) {
+    public void onImageFound(ImageCache imageCache, DownloaderImage downloaderImage, String key, DownloadRequest downloadRequest) {
         final String url = downloadRequest.getUrl();
         final ShutterbugManagerListener listener = downloadRequest.getListener();
 
@@ -99,7 +105,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
             return;
         }
 
-        listener.onImageSuccess(this, bitmap, url);
+        listener.onImageSuccess(this, downloaderImage, url);
         mCacheListeners.remove(idx);
         mCacheUrls.remove(idx);
     }
@@ -131,7 +137,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
     }
 
     @Override
-    public void onImageDownloadSuccess(final ShutterbugDownloader downloader, final InputStream inputStream,
+    public void onImageDownloadSuccess(final ShutterbugDownloader downloader, final DownloaderInputStream inputStream,
             final DownloadRequest downloadRequest) {
         new InputStreamHandlingTask(downloader, downloadRequest).execute(inputStream);
     }
@@ -149,10 +155,9 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
             }
         }
         mDownloadersMap.remove(downloadRequest.getUrl());
-
     }
 
-    private class InputStreamHandlingTask extends AsyncTask<InputStream, Void, Bitmap> {
+    private class InputStreamHandlingTask extends AsyncTask<DownloaderInputStream, Void, DownloaderImage> {
         ShutterbugDownloader mDownloader;
         DownloadRequest      mDownloadRequest;
 
@@ -162,54 +167,71 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         }
 
         @Override
-        protected Bitmap doInBackground(InputStream... params) {
+        protected DownloaderImage doInBackground(DownloaderInputStream... params) {
+            DownloaderInputStream downloaderInputStream = params[0];
+            DownloaderImage downloaderImage = null;
+            final ImageCache sharedImageCache = ImageCache.getSharedImageCache(mContext);
             final int maxWidth = mDownloadRequest.getMaxWidth();
             final int maxHeight = mDownloadRequest.getMaxHeight();
-            final ImageCache sharedImageCache = ImageCache.getSharedImageCache(mContext);
             final String cacheKey = getCacheKey(mDownloadRequest.getUrl(), maxWidth, maxHeight);
-            Bitmap bitmap = null;
-            try {
-                bitmap = BitmapFactory.decodeStream(params[0]);
-            } catch (OutOfMemoryError e) {
-                e.printStackTrace();
-            }
-            if (bitmap != null) {
-                if(maxWidth != 0 && maxHeight != 0) {
-                    float width = bitmap.getWidth();
-                    float height = bitmap.getHeight();
 
-                    if(width > maxWidth || height > maxHeight) {
-                        int newWidth = 0, newHeight = 0;
-                        if(width > height) {
-                            newWidth = maxWidth;
-                            newHeight = (int)((maxWidth / width) * height);
-                        } else {
-                            newHeight = maxHeight;
-                            newWidth = (int)((maxHeight / height) * width);
-                        }
-                        Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
-                        //            if(scaledBitmap != bitmap) {
-                        //                bitmap.recycle();
-                        //            }
-                        bitmap = scaledBitmap;
+            if(MIMETYPE_GIF.equals(downloaderInputStream.getMimetype())) {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                int read;
+                byte[] input = new byte[4096];
+                try {
+                    while ( -1 != ( read = downloaderInputStream.getInputStream().read(input) ) ) {
+                        buffer.write( input, 0, read );
                     }
+                    downloaderImage = new DownloaderImage(buffer.toByteArray());
+                } catch(IOException e) {
+                    Log.d("ShutterbugManager", e.getMessage(), e);
                 }
-                sharedImageCache.storeToDisk(bitmap, cacheKey);
-                sharedImageCache.storeToMemory(bitmap, cacheKey);
+            } else {
+                Bitmap bitmap = null;
+                try {
+                    bitmap = BitmapFactory.decodeStream(params[0].getInputStream());
+                } catch (OutOfMemoryError e) {
+                    e.printStackTrace();
+                }
+                if (bitmap != null) {
+                    if(maxWidth != 0 && maxHeight != 0) {
+                        float width = bitmap.getWidth();
+                        float height = bitmap.getHeight();
+
+                        if(width > maxWidth || height > maxHeight) {
+                            int newWidth = 0, newHeight = 0;
+                            if(width > height) {
+                                newWidth = maxWidth;
+                                newHeight = (int)((maxWidth / width) * height);
+                            } else {
+                                newHeight = maxHeight;
+                                newWidth = (int)((maxHeight / height) * width);
+                            }
+                            bitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
+                        }
+                    }
+                    downloaderImage = new DownloaderImage(bitmap);
+                }
             }
-            return bitmap;
+
+            if(downloaderImage != null) {
+                sharedImageCache.storeToDisk(downloaderImage, cacheKey);
+                sharedImageCache.storeToMemory(downloaderImage, cacheKey);
+            }
+            return downloaderImage;
         }
 
         @Override
-        protected void onPostExecute(Bitmap bitmap) {
+        protected void onPostExecute(DownloaderImage downloaderImage) {
             // Notify all the downloadListener with this downloader
             for (int idx = mDownloaders.size() - 1; idx >= 0; idx--) {
                 final int uidx = idx;
                 ShutterbugDownloader aDownloader = mDownloaders.get(uidx);
                 if (aDownloader == mDownloader) {
                     ShutterbugManagerListener listener = mDownloadImageListeners.get(uidx);
-                    if (bitmap != null) {
-                        listener.onImageSuccess(ShutterbugManager.this, bitmap, mDownloadRequest.getUrl());
+                    if (downloaderImage != null) {
+                        listener.onImageSuccess(ShutterbugManager.this, downloaderImage, mDownloadRequest.getUrl());
                     } else {
                         listener.onImageFailure(ShutterbugManager.this, mDownloadRequest.getUrl());
                     }
@@ -217,7 +239,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
                     mDownloadImageListeners.remove(uidx);
                 }
             }
-            if (bitmap != null) {
+            if (downloaderImage != null) {
             } else { // TODO add retry option
                 mFailedUrls.add(mDownloadRequest.getUrl());
             }

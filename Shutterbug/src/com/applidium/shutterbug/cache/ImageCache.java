@@ -6,31 +6,35 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
+import android.util.Log;
 
 import com.applidium.shutterbug.cache.DiskLruCache.Editor;
 import com.applidium.shutterbug.cache.DiskLruCache.Snapshot;
+import com.applidium.shutterbug.downloader.DownloaderImage;
 import com.applidium.shutterbug.utils.DownloadRequest;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 public class ImageCache {
-    public interface ImageCacheListener {
-        void onImageFound(ImageCache imageCache, Bitmap bitmap, String key, DownloadRequest downloadRequest);
+    private static final String TAG = "ImageCache";
 
+    public interface ImageCacheListener {
+        void onImageFound(ImageCache imageCache, DownloaderImage downloaderImage, String key, DownloadRequest downloadRequest);
         void onImageNotFound(ImageCache imageCache, String key, DownloadRequest downloadRequest);
     }
 
     // 1 entry per key
-    private final static int         DISK_CACHE_VALUE_COUNT = 1;
+    private final static int         DISK_CACHE_VALUE_COUNT = 2;
     // 100 MB of disk cache
     private final static int         DISK_CACHE_MAX_SIZE    = 100 * 1024 * 1024;
 
     private static ImageCache        sImageCache;
     private Context                  mContext;
-    private LruCache<String, Bitmap> mMemoryCache;
+    private LruCache<String, DownloaderImage> mMemoryCache;
     private DiskLruCache             mDiskCache;
 
     ImageCache(Context context) {
@@ -42,12 +46,17 @@ public class ImageCache {
         // Use 1/8th of the available memory for this memory cache.
         final int cacheSize = 1024 * 1024 * memClass / 8;
 
-        mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
+        mMemoryCache = new LruCache<String, DownloaderImage>(cacheSize) {
             @Override
-            protected int sizeOf(String key, Bitmap bitmap) {
+            protected int sizeOf(String key, DownloaderImage downloaderImage) {
+                if(downloaderImage.isBitmap()) {
                 // The cache size will be measured in bytes rather than number
                 // of items.
-                return bitmap.getRowBytes() * bitmap.getHeight();
+                    Bitmap bitmap = downloaderImage.getBitmap();
+                    return bitmap.getRowBytes() * bitmap.getHeight();
+                } else {
+                    return downloaderImage.getMovieBytes().length;
+                }
             }
         };
 
@@ -68,11 +77,12 @@ public class ImageCache {
         }
 
         // First check the in-memory cache...
-        Bitmap cachedBitmap = mMemoryCache.get(cacheKey);
+        Log.d(TAG, "checking for " + cacheKey);
+        DownloaderImage cachedDownloaderImage = mMemoryCache.get(cacheKey);
 
-        if (cachedBitmap != null) {
+        if (cachedDownloaderImage != null) {
             // ...notify listener immediately, no need to go async
-            listener.onImageFound(this, cachedBitmap, cacheKey, downloadRequest);
+            listener.onImageFound(this, cachedDownloaderImage, cacheKey, downloadRequest);
             return;
         }
 
@@ -100,34 +110,41 @@ public class ImageCache {
                 editor.commit();
                 return mDiskCache.get(cacheKey);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.d(TAG, e.getMessage(), e);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.d(TAG, e.getMessage(), e);
         }
         return null;
     }
 
-    public Snapshot storeToDisk(Bitmap bitmap, String cacheKey) {
+    public Snapshot storeToDisk(DownloaderImage downloaderImage, String cacheKey) {
         try {
+            boolean isBitmap = downloaderImage.isBitmap();
             Editor editor = mDiskCache.edit(cacheKey);
-            final OutputStream outputStream = editor.newOutputStream(0);
+            editor.set(0, isBitmap ? "1" : "0");
+            final OutputStream outputStream = editor.newOutputStream(1);
             try {
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                if(isBitmap) {
+                    downloaderImage.getBitmap().compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                } else {
+                    outputStream.write(downloaderImage.getMovieBytes());
+                }
                 outputStream.close();
                 editor.commit();
                 return mDiskCache.get(cacheKey);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.d(TAG, e.getMessage(), e);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.d(TAG, e.getMessage(), e);
         }
         return null;
     }
 
-    public void storeToMemory(Bitmap bitmap, String cacheKey) {
-        mMemoryCache.put(cacheKey, bitmap);
+    public void storeToMemory(DownloaderImage downloaderImage, String cacheKey) {
+        Log.d(TAG, "storeToMemory " + cacheKey);
+        mMemoryCache.put(cacheKey, downloaderImage);
     }
 
     public void clear() {
@@ -135,12 +152,12 @@ public class ImageCache {
             mDiskCache.delete();
             openDiskCache();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.d(TAG, e.getMessage(), e);
         }
         mMemoryCache.evictAll();
     }
 
-    private class BitmapDecoderTask extends AsyncTask<Void, Void, Bitmap> {
+    private class BitmapDecoderTask extends AsyncTask<Void, Void, DownloaderImage> {
         private String             mCacheKey;
         private ImageCacheListener mListener;
         private DownloadRequest    mDownloadRequest;
@@ -152,27 +169,38 @@ public class ImageCache {
         }
 
         @Override
-        protected Bitmap doInBackground(Void... params) {
+        protected DownloaderImage doInBackground(Void... params) {
             try {
                 Snapshot snapshot = mDiskCache.get(mCacheKey);
                 if (snapshot != null) {
                     try {
-                        return BitmapFactory.decodeStream(snapshot.getInputStream(0));
+                        String string = snapshot.getString(0);
+                        if("1".equals(string)) {
+                            return new DownloaderImage(BitmapFactory.decodeStream(snapshot.getInputStream(1)));
+                        } else {
+                            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                            int read;
+                            byte[] input = new byte[4096];
+                            while ( -1 != ( read = snapshot.getInputStream(1).read(input) ) ) {
+                                buffer.write( input, 0, read );
+                            }
+                            return new DownloaderImage(buffer.toByteArray());
+                        }
                     } catch (OutOfMemoryError e) {
-                        e.printStackTrace();
+                        Log.d(TAG, e.getMessage(), e);
                         return null;
                     }
                 } else {
                     return null;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.d(TAG, e.getMessage(), e);
                 return null;
             }
         }
 
         @Override
-        protected void onPostExecute(Bitmap result) {
+        protected void onPostExecute(DownloaderImage result) {
             if (result != null) {
                 storeToMemory(result, mCacheKey);
                 mListener.onImageFound(ImageCache.this, result, mCacheKey, mDownloadRequest);
@@ -195,12 +223,12 @@ public class ImageCache {
             versionCode = mContext.getPackageManager().getPackageInfo(mContext.getPackageName(), 0).versionCode;
         } catch (NameNotFoundException e) {
             versionCode = 0;
-            e.printStackTrace();
+            Log.d(TAG, e.getMessage(), e);
         }
         try {
             mDiskCache = DiskLruCache.open(directory, versionCode, DISK_CACHE_VALUE_COUNT, DISK_CACHE_MAX_SIZE);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.d(TAG, e.getMessage(), e);
         }
     }
 }

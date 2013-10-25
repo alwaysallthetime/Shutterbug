@@ -8,6 +8,7 @@ import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.widget.ImageView;
 
+import com.applidium.shutterbug.downloader.DownloaderImage;
 import com.applidium.shutterbug.utils.ShutterbugManager;
 import com.applidium.shutterbug.utils.ShutterbugManager.ShutterbugManagerListener;
 
@@ -61,11 +62,11 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
     }
 
     @Override
-    public void onImageSuccess(ShutterbugManager imageManager, Bitmap bitmap, String url) {
-        setImageBitmap(bitmap);
+    public void onImageSuccess(ShutterbugManager imageManager, DownloaderImage downloaderImage, String url) {
+        setImageBitmap(downloaderImage.getBitmap());
         requestLayout();
         if (mListener != null) {
-            mListener.onImageFetched(bitmap, url);
+            mListener.onImageFetched(downloaderImage.getBitmap(), url);
         }
     }
 
