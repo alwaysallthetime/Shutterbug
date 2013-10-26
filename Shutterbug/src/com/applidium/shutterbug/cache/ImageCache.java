@@ -134,16 +134,15 @@ public class ImageCache {
                 editor.commit();
                 return mDiskCache.get(cacheKey);
             } catch (Exception e) {
-                Log.d(TAG, e.getMessage(), e);
+                Log.e(TAG, e.getMessage(), e);
             }
         } catch (IOException e) {
-            Log.d(TAG, e.getMessage(), e);
+            Log.e(TAG, e.getMessage(), e);
         }
         return null;
     }
 
     public void storeToMemory(DownloaderImage downloaderImage, String cacheKey) {
-        Log.d(TAG, "storeToMemory " + cacheKey);
         mMemoryCache.put(cacheKey, downloaderImage);
     }
 
@@ -152,7 +151,7 @@ public class ImageCache {
             mDiskCache.delete();
             openDiskCache();
         } catch (IOException e) {
-            Log.d(TAG, e.getMessage(), e);
+            Log.e(TAG, e.getMessage(), e);
         }
         mMemoryCache.evictAll();
     }
@@ -187,14 +186,14 @@ public class ImageCache {
                             return new DownloaderImage(buffer.toByteArray());
                         }
                     } catch (OutOfMemoryError e) {
-                        Log.d(TAG, e.getMessage(), e);
+                        Log.e(TAG, e.getMessage(), e);
                         return null;
                     }
                 } else {
                     return null;
                 }
             } catch (IOException e) {
-                Log.d(TAG, e.getMessage(), e);
+                Log.e(TAG, e.getMessage(), e);
                 return null;
             }
         }
@@ -223,12 +222,12 @@ public class ImageCache {
             versionCode = mContext.getPackageManager().getPackageInfo(mContext.getPackageName(), 0).versionCode;
         } catch (NameNotFoundException e) {
             versionCode = 0;
-            Log.d(TAG, e.getMessage(), e);
+            Log.e(TAG, e.getMessage(), e);
         }
         try {
             mDiskCache = DiskLruCache.open(directory, versionCode, DISK_CACHE_VALUE_COUNT, DISK_CACHE_MAX_SIZE);
         } catch (IOException e) {
-            Log.d(TAG, e.getMessage(), e);
+            Log.e(TAG, e.getMessage(), e);
         }
     }
 }
