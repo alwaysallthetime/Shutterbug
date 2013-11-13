@@ -77,7 +77,6 @@ public class ImageCache {
         }
 
         // First check the in-memory cache...
-        Log.d(TAG, "checking for " + cacheKey);
         DownloaderImage cachedDownloaderImage = mMemoryCache.get(cacheKey);
 
         if (cachedDownloaderImage != null) {
