@@ -5,9 +5,15 @@ import android.graphics.Bitmap;
 public class DownloaderImage {
     private Bitmap mBitmap;
     private byte[] mMovie;
+    private String mMimeType;
 
     public DownloaderImage(Bitmap bitmap) {
         mBitmap = bitmap;
+    }
+
+    public DownloaderImage(Bitmap bitmap, String mimeType) {
+        mBitmap = bitmap;
+        mMimeType = mimeType;
     }
 
     public DownloaderImage(byte[] movieBytes) {
@@ -24,5 +30,9 @@ public class DownloaderImage {
 
     public Bitmap getBitmap() {
         return mBitmap;
+    }
+
+    public String getMimeType() {
+        return mMimeType;
     }
 }

@@ -26,8 +26,6 @@ import java.util.Map;
 
 public class ShutterbugManager implements ImageCacheListener, ShutterbugDownloaderListener {
 
-    private static final String MIMETYPE_GIF = "image/gif";
-
     public interface ShutterbugManagerListener {
         void onImageSuccess(ShutterbugManager imageManager, DownloaderImage downloaderImage, String url);
         void onImageFailure(ShutterbugManager imageManager, String url);
@@ -175,7 +173,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
             final int maxHeight = mDownloadRequest.getMaxHeight();
             final String cacheKey = getCacheKey(mDownloadRequest.getUrl(), maxWidth, maxHeight);
 
-            if(MIMETYPE_GIF.equals(downloaderInputStream.getMimetype())) {
+            if(ImageCache.MIMETYPE_GIF.equals(downloaderInputStream.getMimetype())) {
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                 int read;
                 byte[] input = new byte[4096];
@@ -211,7 +209,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
                             bitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
                         }
                     }
-                    downloaderImage = new DownloaderImage(bitmap);
+                    downloaderImage = new DownloaderImage(bitmap, downloaderInputStream.getMimetype());
                 }
             }
 

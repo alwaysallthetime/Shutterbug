@@ -22,6 +22,10 @@ import java.io.OutputStream;
 public class ImageCache {
     private static final String TAG = "ImageCache";
 
+    public static final String MIMETYPE_GIF = "image/gif";
+    public static final String MIMETYPE_PNG = "image/png";
+    public static final String MIMETYPE_JPEG = "image/jpeg";
+
     public interface ImageCacheListener {
         void onImageFound(ImageCache imageCache, DownloaderImage downloaderImage, String key, DownloadRequest downloadRequest);
         void onImageNotFound(ImageCache imageCache, String key, DownloadRequest downloadRequest);
@@ -125,7 +129,14 @@ public class ImageCache {
             final OutputStream outputStream = editor.newOutputStream(1);
             try {
                 if(isBitmap) {
-                    downloaderImage.getBitmap().compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                    Bitmap bitmap = downloaderImage.getBitmap();
+
+                    String mimeType = downloaderImage.getMimeType();
+                    if(MIMETYPE_PNG.equals(mimeType)) {
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                    } else {
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+                    }
                 } else {
                     outputStream.write(downloaderImage.getMovieBytes());
                 }
@@ -174,7 +185,8 @@ public class ImageCache {
                     try {
                         String string = snapshot.getString(0);
                         if("1".equals(string)) {
-                            return new DownloaderImage(BitmapFactory.decodeStream(snapshot.getInputStream(1)));
+                            Bitmap bitmap = BitmapFactory.decodeStream(snapshot.getInputStream(1));
+                            return new DownloaderImage(bitmap);
                         } else {
                             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                             int read;
