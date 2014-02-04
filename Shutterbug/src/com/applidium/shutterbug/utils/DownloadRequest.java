@@ -19,6 +19,10 @@ public class DownloadRequest {
         return mUrl;
     }
 
+    public String getCacheKeyPrefix() {
+        return mUrl;
+    }
+
     public ShutterbugManagerListener getListener() {
         return mListener;
     }

@@ -9,6 +9,7 @@ import android.util.AttributeSet;
 import android.widget.ImageView;
 
 import com.applidium.shutterbug.downloader.DownloaderImage;
+import com.applidium.shutterbug.utils.CustomCacheKeyObject;
 import com.applidium.shutterbug.utils.ShutterbugManager;
 import com.applidium.shutterbug.utils.ShutterbugManager.ShutterbugManagerListener;
 
@@ -46,6 +47,15 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
 
     public void setImage(String url, int placeholderDrawableId) {
         setImage(url, getContext().getResources().getDrawable(placeholderDrawableId));
+    }
+
+    public void setImage(CustomCacheKeyObject object, Drawable placeholderDrawable) {
+        final ShutterbugManager manager = ShutterbugManager.getSharedImageManager(getContext());
+        manager.cancel(this);
+        setImageDrawable(placeholderDrawable);
+        if (object != null) {
+            manager.download(object, mMaxWidth, mMaxHeight, this);
+        }
     }
 
     public void setImage(String url, Drawable placeholderDrawable) {

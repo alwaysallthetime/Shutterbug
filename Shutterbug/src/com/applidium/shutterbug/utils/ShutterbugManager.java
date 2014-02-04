@@ -59,6 +59,17 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         download(url, 0, 0, listener);
     }
 
+    public void download(final CustomCacheKeyObject object, int maxWidth, int maxHeight, ShutterbugManagerListener listener) {
+        if (object == null || listener == null || mFailedUrls.contains(object.getUrl())) {
+            return;
+        }
+
+        mCacheListeners.add(listener);
+        mCacheUrls.add(object.getUrl());
+        CustomCacheKeyDownloadRequest downloadRequest = new CustomCacheKeyDownloadRequest(object, maxWidth, maxHeight, listener);
+        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(downloadRequest, maxWidth, maxHeight), this, downloadRequest);
+    }
+
     public void download(String url, int maxWidth, int maxHeight, ShutterbugManagerListener listener) {
         if (url == null || listener == null || mFailedUrls.contains(url)) {
             return;
@@ -66,14 +77,15 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
 
         mCacheListeners.add(listener);
         mCacheUrls.add(url);
-        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(url, maxWidth, maxHeight), this, new DownloadRequest(url, maxWidth, maxHeight, listener));
+        DownloadRequest downloadRequest = new DownloadRequest(url, maxWidth, maxHeight, listener);
+        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(downloadRequest, maxWidth, maxHeight), this, downloadRequest);
     }
 
-    public static String getCacheKey(String url, int maxWidth, int maxHeight) {
+    public static String getCacheKey(DownloadRequest downloadRequest, int maxWidth, int maxHeight) {
         try {
-            url = url + "w=" + maxWidth + "&h=" + maxHeight;
+            String key = downloadRequest.getCacheKeyPrefix() + "w=" + maxWidth + "&h=" + maxHeight;
             MessageDigest md = MessageDigest.getInstance("SHA-1");
-            md.update(url.getBytes("UTF-8"), 0, url.length());
+            md.update(key.getBytes("UTF-8"), 0, key.length());
             return String.format("%x", new BigInteger(md.digest()));
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -171,7 +183,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
             final ImageCache sharedImageCache = ImageCache.getSharedImageCache(mContext);
             final int maxWidth = mDownloadRequest.getMaxWidth();
             final int maxHeight = mDownloadRequest.getMaxHeight();
-            final String cacheKey = getCacheKey(mDownloadRequest.getUrl(), maxWidth, maxHeight);
+            final String cacheKey = getCacheKey(mDownloadRequest, maxWidth, maxHeight);
 
             if(ImageCache.MIMETYPE_GIF.equals(downloaderInputStream.getMimetype())) {
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
