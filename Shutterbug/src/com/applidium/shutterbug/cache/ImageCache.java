@@ -12,6 +12,7 @@ import com.applidium.shutterbug.cache.DiskLruCache.Editor;
 import com.applidium.shutterbug.cache.DiskLruCache.Snapshot;
 import com.applidium.shutterbug.downloader.DownloaderImage;
 import com.applidium.shutterbug.utils.DownloadRequest;
+import com.applidium.shutterbug.utils.CustomCacheKeyDownloadRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -20,7 +21,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public class ImageCache {
-    private static final String TAG = "ImageCache";
+    private static final String TAG = "Shutterbug_ImageCache";
 
     public static final String MIMETYPE_GIF = "image/gif";
     public static final String MIMETYPE_PNG = "image/png";
@@ -34,15 +35,22 @@ public class ImageCache {
     // 1 entry per key
     private final static int         DISK_CACHE_VALUE_COUNT = 2;
     // 100 MB of disk cache
-    private final static int         DISK_CACHE_MAX_SIZE    = 100 * 1024 * 1024;
+    private final static int         DEFAULT_DISK_CACHE_SIZE = 100 * 1024 * 1024;
 
     private static ImageCache        sImageCache;
     private Context                  mContext;
+    private int                      mDiskCacheSize;
     private LruCache<String, DownloaderImage> mMemoryCache;
     private DiskLruCache             mDiskCache;
 
     ImageCache(Context context) {
+        this(context, DEFAULT_DISK_CACHE_SIZE);
+    }
+
+    ImageCache(Context context, int diskCacheSize) {
         mContext = context;
+        mDiskCacheSize = diskCacheSize;
+
         // Get memory class of this device, exceeding this amount will throw an
         // OutOfMemory exception.
         final int memClass = ((ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryClass();
@@ -54,8 +62,8 @@ public class ImageCache {
             @Override
             protected int sizeOf(String key, DownloaderImage downloaderImage) {
                 if(downloaderImage.isBitmap()) {
-                // The cache size will be measured in bytes rather than number
-                // of items.
+                    // The cache size will be measured in bytes rather than number
+                    // of items.
                     Bitmap bitmap = downloaderImage.getBitmap();
                     return bitmap.getRowBytes() * bitmap.getHeight();
                 } else {
@@ -65,6 +73,17 @@ public class ImageCache {
         };
 
         openDiskCache();
+    }
+
+    public long getCacheSize() {
+        return mDiskCache.size();
+    }
+
+    public static ImageCache getSharedImageCache(Context context, int maxCacheSize) {
+        if (sImageCache == null) {
+            sImageCache = new ImageCache(context, maxCacheSize);
+        }
+        return sImageCache;
     }
 
     public static ImageCache getSharedImageCache(Context context) {
@@ -160,6 +179,7 @@ public class ImageCache {
         try {
             mDiskCache.delete();
             openDiskCache();
+            Log.d(TAG, "clearing image cache");
         } catch (IOException e) {
             Log.e(TAG, e.getMessage(), e);
         }
@@ -236,7 +256,7 @@ public class ImageCache {
             Log.e(TAG, e.getMessage(), e);
         }
         try {
-            mDiskCache = DiskLruCache.open(directory, versionCode, DISK_CACHE_VALUE_COUNT, DISK_CACHE_MAX_SIZE);
+            mDiskCache = DiskLruCache.open(directory, versionCode, DISK_CACHE_VALUE_COUNT, mDiskCacheSize);
         } catch (IOException e) {
             Log.e(TAG, e.getMessage(), e);
         }

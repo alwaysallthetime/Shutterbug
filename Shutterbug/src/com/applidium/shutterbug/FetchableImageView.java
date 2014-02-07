@@ -14,18 +14,21 @@ import com.applidium.shutterbug.utils.ShutterbugManager;
 import com.applidium.shutterbug.utils.ShutterbugManager.ShutterbugManagerListener;
 
 public class FetchableImageView extends ImageView implements ShutterbugManagerListener {
+
     public interface FetchableImageViewListener {
         void onImageFetched(Bitmap bitmap, String url);
 
         void onImageFailure(String url);
     }
 
+    private ShutterbugManager          mShutterbugManager;
     private FetchableImageViewListener mListener;
     private int                        mMaxWidth;
     private int                        mMaxHeight;
 
     public FetchableImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        mShutterbugManager = ShutterbugManager.getSharedImageManager(context);
     }
 
     public FetchableImageViewListener getListener() {
@@ -50,25 +53,23 @@ public class FetchableImageView extends ImageView implements ShutterbugManagerLi
     }
 
     public void setImage(CustomCacheKeyObject object, Drawable placeholderDrawable) {
-        final ShutterbugManager manager = ShutterbugManager.getSharedImageManager(getContext());
-        manager.cancel(this);
+        mShutterbugManager.cancel(this);
         setImageDrawable(placeholderDrawable);
         if (object != null) {
-            manager.download(object, mMaxWidth, mMaxHeight, this);
+            mShutterbugManager.download(object, mMaxWidth, mMaxHeight, this);
         }
     }
 
     public void setImage(String url, Drawable placeholderDrawable) {
-        final ShutterbugManager manager = ShutterbugManager.getSharedImageManager(getContext());
-        manager.cancel(this);
+        mShutterbugManager.cancel(this);
         setImageDrawable(placeholderDrawable);
         if (url != null) {
-            manager.download(url, mMaxWidth, mMaxHeight, this);
+            mShutterbugManager.download(url, mMaxWidth, mMaxHeight, this);
         }
     }
 
     public void cancelCurrentImageLoad() {
-        ShutterbugManager.getSharedImageManager(getContext()).cancel(this);
+        mShutterbugManager.cancel(this);
     }
 
     @Override

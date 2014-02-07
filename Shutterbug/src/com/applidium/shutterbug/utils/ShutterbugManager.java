@@ -26,6 +26,7 @@ import java.util.Map;
 
 public class ShutterbugManager implements ImageCacheListener, ShutterbugDownloaderListener {
 
+
     public interface ShutterbugManagerListener {
         void onImageSuccess(ShutterbugManager imageManager, DownloaderImage downloaderImage, String url);
         void onImageFailure(ShutterbugManager imageManager, String url);
@@ -34,6 +35,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
     private static ShutterbugManager          sImageManager;
 
     private Context                           mContext;
+    private ImageCache                        mImageCache;
     private List<String>                      mFailedUrls             = new ArrayList<String>();
     private List<ShutterbugManagerListener>   mCacheListeners         = new ArrayList<ShutterbugManagerListener>();
     private List<String>                      mCacheUrls              = new ArrayList<String>();
@@ -44,8 +46,14 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
 
     final static private int                  LISTENER_NOT_FOUND      = -1;
 
+    public ShutterbugManager(Context context, int diskCacheSize) {
+        mContext = context;
+        mImageCache = ImageCache.getSharedImageCache(context, diskCacheSize);
+    }
+
     public ShutterbugManager(Context context) {
         mContext = context;
+        mImageCache = ImageCache.getSharedImageCache(context);
     }
 
     public static ShutterbugManager getSharedImageManager(Context context) {
@@ -53,6 +61,20 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
             sImageManager = new ShutterbugManager(context);
         }
         return sImageManager;
+    }
+
+    /**
+     * Call this before ShutterbugManager (or FetchableImageView) is used.
+     *
+     * @param context
+     * @param diskCacheSize
+     */
+    public static void setDiskCacheSize(Context context, int diskCacheSize) {
+        sImageManager = new ShutterbugManager(context, diskCacheSize);
+    }
+
+    public ImageCache getImageCache() {
+        return mImageCache;
     }
 
     public void download(String url, ShutterbugManagerListener listener) {
@@ -67,7 +89,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         mCacheListeners.add(listener);
         mCacheUrls.add(object.getUrl());
         CustomCacheKeyDownloadRequest downloadRequest = new CustomCacheKeyDownloadRequest(object, maxWidth, maxHeight, listener);
-        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(downloadRequest, maxWidth, maxHeight), this, downloadRequest);
+        mImageCache.queryCache(getCacheKey(downloadRequest, maxWidth, maxHeight), this, downloadRequest);
     }
 
     public void download(String url, int maxWidth, int maxHeight, ShutterbugManagerListener listener) {
@@ -78,7 +100,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         mCacheListeners.add(listener);
         mCacheUrls.add(url);
         DownloadRequest downloadRequest = new DownloadRequest(url, maxWidth, maxHeight, listener);
-        ImageCache.getSharedImageCache(mContext).queryCache(getCacheKey(downloadRequest, maxWidth, maxHeight), this, downloadRequest);
+        mImageCache.queryCache(getCacheKey(downloadRequest, maxWidth, maxHeight), this, downloadRequest);
     }
 
     public static String getCacheKey(DownloadRequest downloadRequest, int maxWidth, int maxHeight) {
@@ -180,7 +202,7 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
         protected DownloaderImage doInBackground(DownloaderInputStream... params) {
             DownloaderInputStream downloaderInputStream = params[0];
             DownloaderImage downloaderImage = null;
-            final ImageCache sharedImageCache = ImageCache.getSharedImageCache(mContext);
+            final ImageCache sharedImageCache = mImageCache;
             final int maxWidth = mDownloadRequest.getMaxWidth();
             final int maxHeight = mDownloadRequest.getMaxHeight();
             final String cacheKey = getCacheKey(mDownloadRequest, maxWidth, maxHeight);
