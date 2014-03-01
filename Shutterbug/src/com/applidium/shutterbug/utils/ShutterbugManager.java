@@ -234,10 +234,10 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
                         if(width > maxWidth || height > maxHeight) {
                             int newWidth = 0, newHeight = 0;
                             if(width > height) {
-                                newWidth = maxWidth;
+                                newWidth = (int) Math.min(width, maxWidth);;
                                 newHeight = (int)((maxWidth / width) * height);
                             } else {
-                                newHeight = maxHeight;
+                                newHeight = (int) Math.min(height, maxHeight);
                                 newWidth = (int)((maxHeight / height) * width);
                             }
                             bitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
