@@ -1,6 +1,7 @@
 package com.applidium.shutterbug.downloader;
 
 import android.os.AsyncTask;
+import android.os.Build;
 
 import com.applidium.shutterbug.utils.DownloadRequest;
 
@@ -95,8 +96,14 @@ public class ShutterbugDownloader {
                 }
             }
 
-        }.execute();
-
+        };
+        // AsyncTask was changed in Honeycomb to execute in serial by default, at which time
+        // executeOnExecutor was added to specify parallel execution.
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            mCurrentTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        } else {
+            mCurrentTask.execute();
+        }
     }
 
     public void cancel() {

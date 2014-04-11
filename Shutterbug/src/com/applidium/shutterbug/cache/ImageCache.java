@@ -6,6 +6,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
 
 import com.applidium.shutterbug.cache.DiskLruCache.Editor;
@@ -109,7 +110,14 @@ public class ImageCache {
         }
 
         if (mDiskCache != null) {
-            new BitmapDecoderTask(cacheKey, listener, downloadRequest).execute();
+            BitmapDecoderTask bitmapDecoderTask = new BitmapDecoderTask(cacheKey, listener, downloadRequest);
+            // AsyncTask was changed in Honeycomb to execute in serial by default, at which time
+            // executeOnExecutor was added to specify parallel execution.
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                bitmapDecoderTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+            } else {
+                bitmapDecoderTask.execute();
+            }
             return;
         }
         listener.onImageNotFound(this, cacheKey, downloadRequest);
@@ -243,11 +251,11 @@ public class ImageCache {
     
     private void openDiskCache() {
         File directory;
-        if (android.os.Environment.getExternalStorageState().equals(android.os.Environment.MEDIA_MOUNTED)) {
-            directory = new File(android.os.Environment.getExternalStorageDirectory(), "Applidium Image Cache");
-        } else {
+//        if (android.os.Environment.getExternalStorageState().equals(android.os.Environment.MEDIA_MOUNTED)) {
+//            directory = new File(android.os.Environment.getExternalStorageDirectory(), "Applidium Image Cache");
+//        } else {
             directory = mContext.getCacheDir();
-        }
+//        }
         int versionCode;
         try {
             versionCode = mContext.getPackageManager().getPackageInfo(mContext.getPackageName(), 0).versionCode;

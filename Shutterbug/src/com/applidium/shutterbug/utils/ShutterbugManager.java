@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
 
 import com.applidium.shutterbug.cache.ImageCache;
@@ -171,7 +172,15 @@ public class ShutterbugManager implements ImageCacheListener, ShutterbugDownload
     @Override
     public void onImageDownloadSuccess(final ShutterbugDownloader downloader, final DownloaderInputStream inputStream,
             final DownloadRequest downloadRequest) {
-        new InputStreamHandlingTask(downloader, downloadRequest).execute(inputStream);
+        InputStreamHandlingTask task = new InputStreamHandlingTask(downloader, downloadRequest);
+
+        // AsyncTask was changed in Honeycomb to execute in serial by default, at which time
+        // executeOnExecutor was added to specify parallel execution.
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, inputStream);
+        } else {
+            task.execute(inputStream);
+        }
     }
 
     @Override
